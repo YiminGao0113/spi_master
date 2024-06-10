@@ -108,8 +108,8 @@ always @(*) begin
         end
 
         WRITE_DATA: begin
-            write_enable               = 1;
             // reg_file[received_address] = received_data;
+            write_enable               = 1;
             state_nxt                  = IDLE;
         end
 

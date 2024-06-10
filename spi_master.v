@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module spi_master #(parameter DATA_WIDTH = 32, parameter ADDRESS_WIDTH = 32)
+module spi_master #(parameter DATA_WIDTH = 32, parameter ADDRESS_WIDTH = 32, parameter CYCLE_TO_WRITE = 3)
 (
     input                                      clock,
     input                                      reset_n,
@@ -176,12 +176,23 @@ always @(*) begin
         end
 
         STOP: begin
-            SS_nxt                  = 1;       // Deselect the slave
-            busy_nxt                = 0;       // Clear the busy flag
-            data_read_valid_nxt     = 0;       // Clear the data read valid flag
-            bit_counter_nxt         = 0;       // Reset the bit counter
-            MOSI_nxt                = 1'bZ;    // Set MOSI to high impedence
-            state_nxt               = IDLE;    // Transition back to the IDLE state
+            // SS_nxt                  = 1;       // Deselect the slave
+            // busy_nxt                = 0;       // Clear the busy flag
+            // data_read_valid_nxt     = 0;       // Clear the data read valid flag
+            // bit_counter_nxt         = 0;       // Reset the bit counter
+            if (tick) begin
+                MOSI_nxt = 1'bZ;
+                if (bit_counter == CYCLE_TO_WRITE-1) begin
+                    bit_counter_nxt = 0;
+                    state_nxt = IDLE;
+                    SS_nxt                  = 1;       // Deselect the slave
+                    busy_nxt                = 0;       // Clear the busy flag
+                    data_read_valid_nxt     = 0;       // Clear the data read valid flag
+                end else begin
+                    bit_counter_nxt = bit_counter + 1;
+                end
+
+            end
         end
 
         default: begin

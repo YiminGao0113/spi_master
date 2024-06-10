@@ -19,7 +19,7 @@ wire SS;
 wire MOSI;
 wire data_read_valid;
 wire MISO;
-reg  slave_clock;
+wire slave_clock;
 reg initialization;
 
 // Clock generation

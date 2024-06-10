@@ -22,6 +22,7 @@ reg [7:0] bit_counter;    // Counter to track bit position
 reg [ADDRESS_WIDTH+DATA_WIDTH-1:0] shift_reg_in;    // Shift register for incoming data
 reg [DATA_WIDTH-1:0] shift_reg_out;   // Shift register for outgoing data
 wire tick, sample;
+reg write_enable;
 
 // State machine states
 parameter IDLE = 3'b000;
@@ -39,11 +40,13 @@ reg [DATA_WIDTH-1:0] data_read_nxt;
 reg [ADDRESS_WIDTH-1:0] received_address;
 reg [ADDRESS_WIDTH-1:0] received_address_nxt;
 reg [DATA_WIDTH-1:0] received_data;
+reg [DATA_WIDTH-1:0] data_test;
+
 reg [DATA_WIDTH-1:0] received_data_nxt;
 reg MISO_nxt;
 
-assign tick   = (CPHA == 0) ? ~SCK : SCK;
-assign sample = (CPHA == 0) ? SCK : ~SCK;
+assign tick   = (CPHA == 0) ? SCK : !SCK;
+assign sample = (CPHA == 0) ? !SCK : SCK;
 
 // Next state and signal logic
 always @(*) begin
@@ -56,6 +59,7 @@ always @(*) begin
     received_address_nxt= received_address;
     received_data_nxt   = received_data;
     MISO_nxt            = MISO;
+    write_enable        = 0;
     
     case (state) 
         IDLE: begin
@@ -104,7 +108,8 @@ always @(*) begin
         end
 
         WRITE_DATA: begin
-            reg_file[received_address] = received_data;
+            write_enable               = 1;
+            // reg_file[received_address] = received_data;
             state_nxt                  = IDLE;
         end
 
@@ -136,6 +141,26 @@ always @(posedge sample or negedge reset_n) begin
     end else begin
         shift_reg_in        <= shift_reg_in_nxt;
         received_data       <= received_data_nxt;
+    end
+end
+
+integer i;
+always @(posedge SCK or negedge reset_n) begin
+    if (!reset_n) begin
+        // Optional: Initialize register file with zeros or specific values
+        for (i = 0; i < (1<<ADDRESS_WIDTH); i = i + 1) begin
+            reg_file[i] <= 0;
+        end
+    end else if (write_enable) begin
+        reg_file[received_address] <= received_data;
+    end
+end
+
+always @(posedge SCK or negedge reset_n) begin
+    if (!reset_n) begin
+        data_read <= 0;
+    end else begin
+        data_test <= reg_file[received_address];
     end
 end
 

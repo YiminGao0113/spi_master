@@ -1,6 +1,4 @@
-`timescale 1ns / 1ps
-
-module tb;
+module spi_master_tb;
 
 reg clock;
 reg reset_n;
@@ -11,14 +9,14 @@ reg rd_we;
 reg [15:0] divider;
 reg clock_phase;
 reg clock_polarity;
+reg MISO;
 wire SCK;
 wire [31:0] data_read;
-wire [31:0] data_read_slave;
 wire busy;
 wire SS;
 wire MOSI;
 wire data_read_valid;
-wire MISO;
+
 
 // Clock generation
 always begin
@@ -45,23 +43,9 @@ spi_master #(.DATA_WIDTH(32), .ADDRESS_WIDTH(32)) spi_master_inst (
     .data_read_valid(data_read_valid)
 );
 
-// Instantiate the SPI slave
-spi_slave #(.DATA_WIDTH(32), .ADDRESS_WIDTH(32)) spi_slave_inst (
-    .SCK(SCK),
-    .CPHA(clock_phase),
-    .SS(SS),
-    .MOSI(MOSI),
-    .MISO(MISO),
-    .reset_n(reset_n),
-    .data_read(data_read_slave),
-    .data_write(data)
-    // .address(address),
-    // .write_enable(rd_we)
-);
-
 initial begin
-    $dumpfile("tb.vcd");
-    $dumpvars(0, tb);
+    $dumpfile("spi_master_tb.vcd");
+    $dumpvars(0, spi_master_tb);
 
     clock = 0;
     reset_n = 0;
@@ -80,6 +64,7 @@ initial begin
 
     // Finish simulation
     #100 $finish;
+
 end
 
 endmodule

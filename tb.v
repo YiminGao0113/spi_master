@@ -61,7 +61,7 @@ spi_slave #(.DATA_WIDTH(32), .ADDRESS_WIDTH(32)) spi_slave_inst (
     // .write_enable(rd_we)
 );
 
-assign slave_clock = initialization? clock : sck;
+assign slave_clock = initialization? clock : SCK;
 
 initial begin
     $dumpfile("tb.vcd");

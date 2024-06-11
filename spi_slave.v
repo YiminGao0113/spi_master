@@ -2,7 +2,8 @@
 
 module spi_slave #(
     parameter DATA_WIDTH = 32,
-    parameter ADDRESS_WIDTH = 32
+    parameter ADDRESS_WIDTH = 32,
+    parameter CYCLE_TO_WRITE = 2
 )(
     input                      SCK,            // SPI clock from master
     input                      CPHA,
@@ -16,7 +17,7 @@ module spi_slave #(
     // input                      write_enable    // Write enable signal
 );
 
-reg [DATA_WIDTH-1:0] reg_file [0:(1<<ADDRESS_WIDTH)-1];  // Register file
+reg [DATA_WIDTH-1:0] reg_file [0:ADDRESS_WIDTH-1];  // Register file
 
 reg [7:0] bit_counter;    // Counter to track bit position
 reg [ADDRESS_WIDTH+DATA_WIDTH-1:0] shift_reg_in;    // Shift register for incoming data
@@ -63,6 +64,8 @@ always @(*) begin
     
     case (state) 
         IDLE: begin
+            received_address_nxt = 0;
+            received_data_nxt    = 0;
             if (!SS) begin
                 bit_counter_nxt     = 0;
                 state_nxt           = RECEIVE_ADDRESS;
@@ -93,6 +96,7 @@ always @(*) begin
                 bit_counter_nxt     = bit_counter + 1;
             end else begin
                 state_nxt           = IDLE;
+                MISO_nxt            = 1'bZ;
             end
         end
 
@@ -108,9 +112,14 @@ always @(*) begin
         end
 
         WRITE_DATA: begin
-            // reg_file[received_address] = received_data;
-            write_enable               = 1;
-            state_nxt                  = IDLE;
+            if (bit_counter == CYCLE_TO_WRITE-1) begin
+                bit_counter_nxt            = 0;
+                state_nxt                  = IDLE;
+            end
+            else begin
+                bit_counter_nxt        = bit_counter + 1;
+                write_enable               = 1;
+            end
         end
 
     endcase

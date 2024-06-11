@@ -49,7 +49,7 @@ spi_master #(.DATA_WIDTH(32), .ADDRESS_WIDTH(32)) spi_master_inst (
 
 // Instantiate the SPI slave
 spi_slave #(.DATA_WIDTH(32), .ADDRESS_WIDTH(32)) spi_slave_inst (
-    .SCK(slave_clock),
+    .SCK(SCK),
     .CPHA(clock_phase),
     .SS(SS),
     .MOSI(MOSI),
@@ -57,11 +57,9 @@ spi_slave #(.DATA_WIDTH(32), .ADDRESS_WIDTH(32)) spi_slave_inst (
     .reset_n(reset_n),
     .data_read(data_read_slave),
     .data_write(data)
-    // .address(address),
-    // .write_enable(rd_we)
 );
 
-assign slave_clock = initialization? clock : SCK;
+// assign slave_clock = initialization? clock : SCK;
 
 initial begin
     $dumpfile("tb.vcd");
@@ -70,7 +68,6 @@ initial begin
 
     clock = 0;
     reset_n = 0;
-    initialization = 1;
 
     data = 32'hA5A5A5A5;
     address = 32'h00000010;
@@ -80,11 +77,13 @@ initial begin
     clock_phase = 0;
     clock_polarity = 0;
 
-    // Reset the system
+    // Reset the system, perform write operation
     #10 reset_n = 1;
-    initialization = 0;
+    enable = 1;
+    #10 enable = 0;
 
-    // Perform write operation
+    #4000 
+    // Perform read operation
     #100 enable = 1;
     rd_we = 1;
 
@@ -93,11 +92,6 @@ initial begin
 
     // Wait for the operation to complete
     #4000 
-
-    // Perform read operation
-    #10 enable = 1;
-    rd_we = 0;
-    #10 enable = 0;
 
     // Wait for the operation to complete
     #2000 enable = 0;

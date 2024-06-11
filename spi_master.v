@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module spi_master #(parameter DATA_WIDTH = 32, parameter ADDRESS_WIDTH = 32, parameter CYCLE_TO_WRITE = 3)
+module spi_master #(parameter DATA_WIDTH = 32, parameter ADDRESS_WIDTH = 32, parameter CYCLE_TO_WRITE = 2, parameter CYCLE_TO_READ = 2)
 (
     input                                      clock,
     input                                      reset_n,
@@ -50,8 +50,8 @@ reg         [DATA_WIDTH-1:0]                    saved_data;
 reg         [DATA_WIDTH-1:0]                    saved_data_nxt;
 reg         [DATA_WIDTH+ADDRESS_WIDTH:0]        MOSI_shift_register;
 reg         [DATA_WIDTH+ADDRESS_WIDTH:0]        MOSI_shift_register_nxt;
-reg         [DATA_WIDTH+ADDRESS_WIDTH:0]        MISO_shift_register;
-reg         [DATA_WIDTH+ADDRESS_WIDTH:0]        MISO_shift_register_nxt;
+reg         [DATA_WIDTH-1:0]        MISO_shift_register;
+reg         [DATA_WIDTH-1:0]        MISO_shift_register_nxt;
 reg                                             serial_clk;
 reg                                             tick;
 reg [15:0]                                      counter;
@@ -113,6 +113,7 @@ always @(*) begin
             MOSI_shift_register_nxt     =    0;
             MISO_shift_register_nxt     =    0;
             MOSI_nxt                    =    1'bZ;
+            busy_nxt                    =    0;
 
             if (enable) begin
                 busy_nxt                =   1;
@@ -140,6 +141,7 @@ always @(*) begin
                 if (bit_counter == ADDRESS_WIDTH) begin
                     bit_counter_nxt = 0;
                     state_nxt = saved_rd_we ? READ_DATA : TRANSMIT_DATA;
+                    MOSI_nxt  = saved_rd_we ? 1'bZ : MOSI_nxt;                    
                 end else begin
                     bit_counter_nxt = bit_counter + 1;
                 end
@@ -149,14 +151,17 @@ always @(*) begin
         READ_DATA: begin
             busy_nxt = 1;
             if (tick) begin
-                if (bit_counter == DATA_WIDTH) begin
+                MOSI_nxt = 1'bZ;
+                if (bit_counter == DATA_WIDTH+CYCLE_TO_READ) begin
                     bit_counter_nxt = 0;
                     state_nxt = STOP;
                     data_read_valid_nxt = 1;
                     data_read_nxt = MISO_shift_register[DATA_WIDTH-1:0];
+                end else if (bit_counter < CYCLE_TO_READ) begin
+                    bit_counter_nxt = bit_counter + 1;
                 end else begin
                     bit_counter_nxt = bit_counter + 1;
-                    MISO_shift_register_nxt = {MISO_shift_register[DATA_WIDTH+ADDRESS_WIDTH:1], MISO};
+                    MISO_shift_register_nxt = {MISO_shift_register[DATA_WIDTH-2:0], MISO};
                 end
             end
         end
@@ -177,18 +182,19 @@ always @(*) begin
 
         STOP: begin
             // SS_nxt                  = 1;       // Deselect the slave
-            // busy_nxt                = 0;       // Clear the busy flag
+            busy_nxt                = 1;       // Clear the busy flag
             // data_read_valid_nxt     = 0;       // Clear the data read valid flag
             // bit_counter_nxt         = 0;       // Reset the bit counter
             if (tick) begin
                 MOSI_nxt = 1'bZ;
-                if (bit_counter == CYCLE_TO_WRITE-1) begin
+                if (bit_counter == CYCLE_TO_WRITE) begin
                     bit_counter_nxt = 0;
                     state_nxt = IDLE;
                     SS_nxt                  = 1;       // Deselect the slave
-                    busy_nxt                = 0;       // Clear the busy flag
+                    // busy_nxt                = 0;       // Clear the busy flag
                     data_read_valid_nxt     = 0;       // Clear the data read valid flag
                 end else begin
+                    // busy_nxt = 1;
                     bit_counter_nxt = bit_counter + 1;
                 end
 
@@ -206,8 +212,6 @@ always @(posedge tick or negedge reset_n) begin
     if (!reset_n) begin
         // busy                    <= 0;
         // MOSI                    <= 0;
-        bit_counter             <= 0;
-        saved_rd_we             <= 0;
         saved_CPHA              <= 0;
         saved_CPOL              <= 0;
         MISO_shift_register     <= 0;
@@ -215,13 +219,13 @@ always @(posedge tick or negedge reset_n) begin
         data_read_valid         <= 0;
         MOSI_shift_register     <= 0;
     end else begin
-        if (state != IDLE && state != STOP) begin
+        if (state != IDLE) begin
             state <= state_nxt;
             MOSI                    <= MOSI_nxt;
+            bit_counter             <= bit_counter_nxt;
         end
+        if (state == STOP) SS   <= SS_nxt;
         // busy                    <= busy_nxt;
-        bit_counter             <= bit_counter_nxt;
-        saved_rd_we             <= saved_rd_we_nxt;
         saved_CPHA              <= saved_CPHA_nxt;
         saved_CPOL              <= saved_CPOL_nxt;
         MISO_shift_register     <= MISO_shift_register_nxt;
@@ -239,14 +243,18 @@ always @(posedge clock or negedge reset_n) begin
         MOSI <= 1'bZ;
         saved_address           <= 0;
         saved_data              <= 0;
+        saved_rd_we             <= 0;
+        bit_counter             <= 0;
     end
     else begin
-        if (state == IDLE||state == STOP) begin
+        if (state == IDLE) begin
             state <= state_nxt;
             MOSI  <= MOSI_nxt;
+            bit_counter <= bit_counter_nxt;
         end
+        if (state == SET_SS) SS   <= SS_nxt;
         busy <= busy_nxt;
-        SS   <= SS_nxt;
+        saved_rd_we             <= saved_rd_we_nxt;
         saved_address           <= saved_address_nxt;
         saved_data              <= saved_data_nxt;
     end
